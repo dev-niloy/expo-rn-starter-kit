@@ -24,7 +24,7 @@
 
 3. **If Your PC Is Not Set Up for Local Builds**
    - Follow the official Expo guide to set up your environment:
-     https://docs.expo.dev/get-started/set-up-your-environment/?mode=development-build
+     https://docs.expo.dev/get-started/set-up-your-environment/?mode=development-build&buildEnv=local
 
 ---
 
