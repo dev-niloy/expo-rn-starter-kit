@@ -1,50 +1,32 @@
-# Welcome to your Expo app 👋
+# DevApp Setup Instructions
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+## Environment Variables
 
-## Get started
+- All static environment variables should be set in `filesUrl.ts`.
 
-1. Install dependencies
+## Android Local Build & Installation
 
-   ```bash
-   npm install
-   ```
+1. **Enable USB Debugging on Your Device**
+   - On your Android phone, go to Developer Options and turn on USB debugging.
+   - Connect your phone to your PC via USB.
+   - Allow debugging permission when prompted on your device.
 
-2. Start the app
+2. **Build and Install the App Locally**
+   - In your project terminal, run:
+     ```sh
+     npm run android
+     ```
+   - Wait for the build process to complete. This may take some time.
+   - The app will be automatically installed and opened on your device if your PC is properly configured for Android development.
 
-   ```bash
-   npx expo start
-   ```
+> **Note:**
+> You need a local build because installing packages outside the Expo community (from npm) will not work with Expo Go.
 
-In the output, you'll find options to open the app in a
+3. **If Your PC Is Not Set Up for Local Builds**
+   - Follow the official Expo guide to set up your environment:
+     https://docs.expo.dev/get-started/set-up-your-environment/?mode=development-build
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+---
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- For any static URLs or environment variables, edit `filesUrl.ts`.
+- Make sure your Android device is connected and authorized for debugging before running the build command.
