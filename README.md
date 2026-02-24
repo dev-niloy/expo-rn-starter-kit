@@ -30,4 +30,3 @@
 
 - For any static URLs or environment variables, edit `filesUrl.ts`.
 - Make sure your Android device is connected and authorized for debugging before running the build command.
-# expo-rn-starter-kit
