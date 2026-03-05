@@ -308,9 +308,9 @@ export default function GameScreen() {
       updateGame(gameRef.current, dt);
     }
 
-    // Throttle React re-renders to ~24fps (every 42ms) for smoother touch response
+    // Throttle React re-renders to ~16fps (every 60ms) for smoother touch response
     // Game logic still runs at 60fps, only UI updates are throttled
-    if (now - lastRenderRef.current >= 42) {
+    if (now - lastRenderRef.current >= 60) {
       lastRenderRef.current = now;
       setTick((t) => t + 1);
     }
@@ -361,16 +361,11 @@ export default function GameScreen() {
   const currentGame = gameRef.current;
   if (!currentGame) return <View style={styles.container} />;
 
-  // Compute lives display
-  const livesDisplay: string[] = [];
-  for (let i = 0; i < currentGame.maxLives; i++) {
-    livesDisplay.push(i < currentGame.lives ? "❤️" : "🖤");
-  }
-
-  // Compute combo
-  let comboMultiplier = 1;
-  if (currentGame.combo >= 10) comboMultiplier = 3;
-  else if (currentGame.combo >= 5) comboMultiplier = 2;
+  // Pre-compute values (fast operations)
+  const { lives, maxLives, combo, score, difficulty } = currentGame;
+  const livesDisplay = "❤️".repeat(lives) + "🖤".repeat(maxLives - lives);
+  const comboMultiplier = combo >= 10 ? 3 : combo >= 5 ? 2 : 1;
+  const level = Math.floor(difficulty);
 
   return (
     <View style={styles.container} {...panResponder.panHandlers}>
@@ -408,7 +403,7 @@ export default function GameScreen() {
         {/* Left side - Lives and controls */}
         <View style={styles.hudLeft}>
           <View style={styles.livesContainer}>
-            <Text style={styles.livesText}>{livesDisplay.join(" ")}</Text>
+            <Text style={styles.livesText}>{livesDisplay}</Text>
           </View>
           <View style={styles.controlsRow}>
             <TouchableOpacity
@@ -431,15 +426,12 @@ export default function GameScreen() {
         {/* Center - Level and Combo */}
         <View style={styles.hudCenter}>
           <View style={styles.levelContainer}>
-            <Text style={styles.levelLabel}>LEVEL</Text>
-            <Text style={styles.levelValue}>{Math.floor(currentGame.difficulty)}</Text>
+            <Text style={styles.levelLabel}>LV</Text>
+            <Text style={styles.levelValue}>{level}</Text>
           </View>
-          {currentGame.combo >= 3 && (
+          {combo >= 3 && (
             <View style={styles.comboContainer}>
-              <Text style={styles.comboText}>
-                🔥 x{comboMultiplier}
-              </Text>
-              <Text style={styles.comboCount}>{currentGame.combo} hits</Text>
+              <Text style={styles.comboText}>🔥x{comboMultiplier}</Text>
             </View>
           )}
         </View>
@@ -447,8 +439,7 @@ export default function GameScreen() {
         {/* Right side - Score */}
         <View style={styles.hudRight}>
           <View style={styles.scoreContainer}>
-            <Text style={styles.scoreLabel}>SCORE</Text>
-            <Text style={styles.scoreValue}>{currentGame.score.toLocaleString()}</Text>
+            <Text style={styles.scoreValue}>{score}</Text>
           </View>
         </View>
       </View>
@@ -461,22 +452,24 @@ export default function GameScreen() {
               <Text style={styles.pauseIcon}>⏸️</Text>
             </View>
             <Text style={styles.overlayTitle}>GAME PAUSED</Text>
-            
+
             {/* Game Stats */}
             <View style={styles.statsContainer}>
               <View style={styles.statItem}>
                 <Text style={styles.statLabel}>Score</Text>
-                <Text style={styles.statValue}>{currentGame.score.toLocaleString()}</Text>
+                <Text style={styles.statValue}>{score}</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Text style={styles.statLabel}>Level</Text>
-                <Text style={styles.statValue}>{Math.floor(currentGame.difficulty)}</Text>
+                <Text style={styles.statValue}>{level}</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Text style={styles.statLabel}>Lives</Text>
-                <Text style={styles.statValue}>{currentGame.lives}/{currentGame.maxLives}</Text>
+                <Text style={styles.statValue}>
+                  {lives}/{maxLives}
+                </Text>
               </View>
             </View>
 
@@ -485,14 +478,14 @@ export default function GameScreen() {
               onPress={handlePause}
               activeOpacity={0.8}
             >
-              <Text style={styles.resumeBtnText}>▶️  RESUME</Text>
+              <Text style={styles.resumeBtnText}>▶️ RESUME</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.quitBtn}
               onPress={handleQuit}
               activeOpacity={0.8}
             >
-              <Text style={styles.quitBtnText}>🏠  QUIT TO MENU</Text>
+              <Text style={styles.quitBtnText}>🏠 QUIT TO MENU</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -828,82 +821,61 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   livesContainer: {
-    backgroundColor: "rgba(255,255,255,0.95)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
   },
   livesText: {
-    fontSize: 18,
-    letterSpacing: 2,
+    fontSize: 16,
   },
   controlsRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: 6,
   },
   hudBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.95)",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.9)",
     alignItems: "center",
     justifyContent: "center",
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
   },
   hudBtnText: {
-    fontSize: 20,
+    fontSize: 18,
   },
   hudCenter: {
     alignItems: "center",
     gap: 8,
   },
   levelContainer: {
-    backgroundColor: "rgba(103, 58, 183, 0.9)",
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 16,
+    backgroundColor: "rgba(103, 58, 183, 0.85)",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 14,
+    flexDirection: "row",
     alignItems: "center",
-    elevation: 4,
-    shadowColor: "#4527A0",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    gap: 4,
   },
   levelLabel: {
-    fontSize: 9,
+    fontSize: 12,
     fontWeight: "700",
     color: "rgba(255,255,255,0.8)",
-    letterSpacing: 1.5,
   },
   levelValue: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "900",
     color: "#FFF",
   },
   comboContainer: {
-    backgroundColor: "rgba(255, 87, 34, 0.95)",
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 16,
-    alignItems: "center",
-    elevation: 4,
-    shadowColor: "#E64A19",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
+    backgroundColor: "rgba(255, 87, 34, 0.9)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
   },
   comboText: {
-    fontSize: 16,
-    fontWeight: "900",
+    fontSize: 14,
+    fontWeight: "800",
     color: "#FFF",
   },
   comboCount: {
@@ -915,28 +887,17 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   scoreContainer: {
-    backgroundColor: "rgba(255,255,255,0.95)",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 16,
-    alignItems: "center",
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    minWidth: 90,
-  },
-  scoreLabel: {
-    fontSize: 9,
-    fontWeight: "700",
-    color: "#888",
-    letterSpacing: 1.5,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    minWidth: 70,
   },
   scoreValue: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: "900",
     color: "#2E7D32",
+    textAlign: "center",
   },
 
   // ---- Pause Overlay ----
