@@ -4,6 +4,7 @@
    OPTIMIZED FOR 60FPS PERFORMANCE
    ============================================ */
 
+import { GameAudio } from "@/utils/audio";
 import {
   createGameState,
   EGG_TYPES,
@@ -250,18 +251,19 @@ export default function GameScreen() {
   const gameRef = useRef<GameState>(
     createGameState(SCREEN_W, SCREEN_H, {
       onCatch: () => {
-        // Play catch sound if not muted
+        GameAudio.playCatch();
       },
       onGoldenCatch: () => {
-        // Play golden catch sound
+        GameAudio.playGoldenCatch();
       },
       onHurt: () => {
-        // Play hurt sound
+        GameAudio.playHurt();
       },
       onPowerup: () => {
-        // Play powerup sound
+        GameAudio.playPowerup();
       },
       onGameOver: (score: number) => {
+        GameAudio.playGameOver();
         router.push({
           pathname: "/gameover",
           params: { score: score.toString() },
@@ -349,7 +351,8 @@ export default function GameScreen() {
   }, [loop]);
 
   const handleMute = useCallback(() => {
-    setIsMuted((m) => !m);
+    const newMuted = GameAudio.toggleMute();
+    setIsMuted(newMuted);
   }, []);
 
   const handleQuit = useCallback(() => {
@@ -443,6 +446,51 @@ export default function GameScreen() {
           </View>
         </View>
       </View>
+
+      {/* ---- POWER COUNTDOWN TIMERS ---- */}
+      {(currentGame.powerups.magnet.active ||
+        currentGame.powerups.freeze.active) && (
+        <View style={[styles.powerTimers, { top: insets.top + 65 }]}>
+          {currentGame.powerups.magnet.active && (
+            <View style={styles.powerTimer}>
+              <Text style={styles.powerTimerEmoji}>🧲</Text>
+              <View style={styles.powerTimerBar}>
+                <View
+                  style={[
+                    styles.powerTimerFill,
+                    {
+                      width: `${(currentGame.powerups.magnet.timer / 8) * 100}%`,
+                      backgroundColor: "#9C27B0",
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.powerTimerText}>
+                {Math.ceil(currentGame.powerups.magnet.timer)}s
+              </Text>
+            </View>
+          )}
+          {currentGame.powerups.freeze.active && (
+            <View style={styles.powerTimer}>
+              <Text style={styles.powerTimerEmoji}>❄️</Text>
+              <View style={styles.powerTimerBar}>
+                <View
+                  style={[
+                    styles.powerTimerFill,
+                    {
+                      width: `${(currentGame.powerups.freeze.timer / 5) * 100}%`,
+                      backgroundColor: "#00BCD4",
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.powerTimerText}>
+                {Math.ceil(currentGame.powerups.freeze.timer)}s
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
 
       {/* ---- PAUSE OVERLAY ---- */}
       {isPaused && (
@@ -898,6 +946,46 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: "#2E7D32",
     textAlign: "center",
+  },
+
+  // ---- Power Timers ----
+  powerTimers: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 12,
+    zIndex: 50,
+  },
+  powerTimer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    gap: 6,
+  },
+  powerTimerEmoji: {
+    fontSize: 16,
+  },
+  powerTimerBar: {
+    width: 50,
+    height: 6,
+    backgroundColor: "rgba(255,255,255,0.3)",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  powerTimerFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  powerTimerText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#FFF",
+    minWidth: 22,
   },
 
   // ---- Pause Overlay ----

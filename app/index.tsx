@@ -34,7 +34,8 @@ const firebaseConfig = {
   appId: "1:835418629907:android:30939b48089bdb6a625ce6",
 };
 
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase (handled by firebase.ts)
+initializeApp(firebaseConfig);
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -158,6 +159,11 @@ export default function MenuScreen() {
   const handleLeaderboard = () => {
     GameAudio.playClick();
     router.push("/leaderboard");
+  };
+
+  const handleSettings = () => {
+    GameAudio.playClick();
+    router.push("/settings" as any);
   };
 
   return (
@@ -299,6 +305,14 @@ export default function MenuScreen() {
           activeOpacity={0.8}
         >
           <Text style={styles.btnLeaderboardText}>🏆 LEADERBOARD</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.btnSettings}
+          onPress={handleSettings}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.btnSettingsText}>⚙️ SETTINGS</Text>
         </TouchableOpacity>
       </View>
 
@@ -523,6 +537,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   btnLeaderboardText: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    letterSpacing: 1,
+  },
+  btnSettings: {
+    backgroundColor: "#607D8B",
+    paddingHorizontal: 40,
+    paddingVertical: 16,
+    borderRadius: 50,
+    elevation: 6,
+    shadowColor: "#455A64",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    minWidth: 220,
+    alignItems: "center",
+  },
+  btnSettingsText: {
     fontSize: 20,
     fontWeight: "800",
     color: "#FFFFFF",

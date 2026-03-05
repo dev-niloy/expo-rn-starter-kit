@@ -2,21 +2,22 @@
    EGG CATCHER – Leaderboard Screen
    ============================================ */
 
-import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Dimensions,
-  ActivityIndicator,
-} from "react-native";
+import { GameAudio } from "@/utils/audio";
+import { FirebaseService } from "@/utils/firebase";
+import { Storage } from "@/utils/storage";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GameAudio } from "@/utils/audio";
-import { Storage } from "@/utils/storage";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
@@ -74,14 +75,29 @@ export default function LeaderboardScreen() {
   const fetchLeaderboard = async () => {
     setLoading(true);
     try {
-      // Try fetching from server
-      const { NODE_LIVE_URL } = require("../filesUrl");
-      const res = await fetch(`${NODE_LIVE_URL.replace("/api", "")}/api/leaderboard`, {
-        signal: AbortSignal.timeout(5000),
-      });
-      const data = await res.json();
-      if (data.success && data.leaderboard?.length > 0) {
-        setLeaderboard(data.leaderboard);
+      // Try fetching from Firebase first
+      const firebaseLeaderboard = await FirebaseService.getLeaderboard(20);
+      if (firebaseLeaderboard.length > 0) {
+        setLeaderboard(
+          firebaseLeaderboard.map((entry) => ({
+            name: entry.name,
+            avatar: entry.avatar,
+            score: entry.score,
+          })),
+        );
+      } else {
+        // Fall back to server API
+        const { NODE_LIVE_URL } = require("../filesUrl");
+        const res = await fetch(
+          `${NODE_LIVE_URL.replace("/api", "")}/api/leaderboard`,
+          {
+            signal: AbortSignal.timeout(5000),
+          },
+        );
+        const data = await res.json();
+        if (data.success && data.leaderboard?.length > 0) {
+          setLeaderboard(data.leaderboard);
+        }
       }
     } catch {
       // Use demo data
@@ -143,8 +159,7 @@ export default function LeaderboardScreen() {
           leaderboard.map((entry, index) => {
             const rank = index + 1;
             const isTop3 = rank <= 3;
-            const isCurrent =
-              currentUserName && entry.name === currentUserName;
+            const isCurrent = currentUserName && entry.name === currentUserName;
 
             return (
               <View
@@ -168,12 +183,7 @@ export default function LeaderboardScreen() {
                 </View>
 
                 {/* Avatar */}
-                <View
-                  style={[
-                    styles.avatar,
-                    isTop3 && styles.avatarTop3,
-                  ]}
-                >
+                <View style={[styles.avatar, isTop3 && styles.avatarTop3]}>
                   <Text style={styles.avatarEmoji}>
                     {AVATAR_EMOJIS[index % AVATAR_EMOJIS.length]}
                   </Text>
@@ -182,7 +192,10 @@ export default function LeaderboardScreen() {
                 {/* Name */}
                 <View style={styles.nameContainer}>
                   <Text
-                    style={[styles.nameText, isCurrent && styles.nameTextCurrent]}
+                    style={[
+                      styles.nameText,
+                      isCurrent && styles.nameTextCurrent,
+                    ]}
                     numberOfLines={1}
                   >
                     {entry.name}
@@ -191,7 +204,9 @@ export default function LeaderboardScreen() {
                 </View>
 
                 {/* Score */}
-                <Text style={[styles.scoreText, isTop3 && styles.scoreTextTop3]}>
+                <Text
+                  style={[styles.scoreText, isTop3 && styles.scoreTextTop3]}
+                >
                   {entry.score.toLocaleString()}
                 </Text>
               </View>
