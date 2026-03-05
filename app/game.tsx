@@ -1,12 +1,16 @@
 /* ============================================
    EGG CATCHER – Game Screen
    The main gameplay rendered with RN views + emojis
+   OPTIMIZED FOR 60FPS PERFORMANCE
    ============================================ */
 
 import {
   createGameState,
   EGG_TYPES,
+  EggObject,
   GameState,
+  ParticleObject,
+  ScorePopup,
   startGame,
   togglePause,
   updateGame,
@@ -18,12 +22,12 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
-  useReducer,
   useRef,
   useState,
 } from "react";
 import {
   Dimensions,
+  InteractionManager,
   PanResponder,
   StyleSheet,
   Text,
@@ -33,6 +37,146 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
+
+// Pre-computed styles for eggs to avoid inline style creation
+const eggFontSizes: Record<number, { fontSize: number }> = {};
+for (let i = 20; i <= 60; i++) {
+  eggFontSizes[i] = { fontSize: i * 1.2 };
+}
+
+// Egg component - no memo since egg properties are mutated
+function Egg({ egg }: { egg: EggObject }) {
+  const fontSize = Math.round(egg.w);
+  return (
+    <View
+      style={{
+        position: "absolute",
+        zIndex: 10,
+        left: egg.x - egg.w * 0.6,
+        top: egg.y - egg.h * 0.6,
+        transform: [{ rotate: `${egg.rotAngle.toFixed(2)}rad` }],
+      }}
+    >
+      <Text style={eggFontSizes[fontSize] || { fontSize: egg.w * 1.2 }}>
+        {EGG_TYPES[egg.type].emoji}
+      </Text>
+    </View>
+  );
+}
+
+// Particle component - no memo since particle properties are mutated
+function Particle({ p }: { p: ParticleObject }) {
+  return (
+    <Text
+      style={{
+        position: "absolute",
+        zIndex: 20,
+        left: p.x - p.size / 2,
+        top: p.y - p.size / 2,
+        fontSize: p.size,
+        opacity: Math.max(0, p.life),
+      }}
+    >
+      {p.emoji}
+    </Text>
+  );
+}
+
+// ScorePopup component - no memo since properties are mutated
+function ScorePopupItem({ sp }: { sp: ScorePopup }) {
+  const color =
+    sp.popType === "negative"
+      ? "#E53935"
+      : sp.popType === "golden"
+        ? "#FFD700"
+        : "#4CAF50";
+  return (
+    <Text
+      style={{
+        position: "absolute",
+        width: 100,
+        textAlign: "center",
+        fontSize: 20,
+        fontWeight: "800",
+        zIndex: 25,
+        textShadowColor: "rgba(0,0,0,0.3)",
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 3,
+        left: sp.x - 50,
+        top: sp.y,
+        opacity: Math.max(0, sp.life),
+        color,
+      }}
+    >
+      {sp.text}
+    </Text>
+  );
+}
+
+// Memoized Character component
+const Character = memo(function Character({
+  basketX,
+  basketY,
+  basketW,
+  magnetActive,
+  freezeActive,
+}: {
+  basketX: number;
+  basketY: number;
+  basketW: number;
+  magnetActive: boolean;
+  freezeActive: boolean;
+}) {
+  const containerStyle = useMemo(
+    () => [
+      styles.basketContainer,
+      {
+        left: basketX - basketW / 2,
+        top: basketY - 30,
+      },
+    ],
+    [basketX, basketY, basketW],
+  );
+
+  return (
+    <View style={containerStyle} pointerEvents="none">
+      {/* Character head */}
+      <View style={styles.characterHead}>
+        <View style={styles.cap} />
+        <View style={styles.face}>
+          <View style={styles.eyeRow}>
+            <View style={styles.eye} />
+            <View style={styles.eye} />
+          </View>
+          <Text style={styles.mouth}>⌣</Text>
+        </View>
+      </View>
+
+      {/* Character body */}
+      <View style={styles.characterBody}>
+        <View style={styles.armLeft} />
+        <View style={styles.armRight} />
+        <View style={styles.overalls}>
+          <View style={styles.shirt} />
+        </View>
+      </View>
+
+      {/* Basket */}
+      <View style={[styles.basket, { width: basketW }]}>
+        <View style={styles.basketRim} />
+        <View style={styles.basketBody}>
+          <View style={styles.weaveLine} />
+          <View style={[styles.weaveLine, { top: "50%" }]} />
+          <View style={[styles.weaveLine, { top: "75%" }]} />
+        </View>
+      </View>
+
+      {/* Powerup Auras */}
+      {magnetActive && <View style={[styles.aura, styles.magnetAura]} />}
+      {freezeActive && <View style={[styles.aura, styles.freezeAura]} />}
+    </View>
+  );
+});
 
 // Memoized static background component - never re-renders
 const StaticBackground = memo(function StaticBackground() {
@@ -93,8 +237,8 @@ const StaticBackground = memo(function StaticBackground() {
 export default function GameScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  // Use useReducer for efficient force updates
-  const [, forceUpdate] = useReducer((x) => x + 1, 0);
+  // Use simple state for force update - more predictable
+  const [, setTick] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const animFrameRef = useRef<number>(0);
@@ -131,7 +275,7 @@ export default function GameScreen() {
     startGame(gameRef.current);
   }, []);
 
-  // PanResponder for touch input - optimized
+  // PanResponder for touch input - optimized with InteractionManager
   const panResponder = useMemo(
     () =>
       PanResponder.create({
@@ -141,6 +285,7 @@ export default function GameScreen() {
           gameRef.current.inputX = evt.nativeEvent.pageX;
         },
         onPanResponderMove: (evt) => {
+          // Direct assignment - no state updates during touch
           gameRef.current.inputX = evt.nativeEvent.pageX;
         },
         onPanResponderRelease: () => {
@@ -150,7 +295,7 @@ export default function GameScreen() {
     [],
   );
 
-  // Game loop - optimized with throttled rendering
+  // Game loop - MAXIMUM OPTIMIZATION
   const loop = useCallback(() => {
     if (!isRunning.current) return;
 
@@ -158,15 +303,16 @@ export default function GameScreen() {
     const dt = Math.min((now - lastTimeRef.current) / 1000, 0.05);
     lastTimeRef.current = now;
 
-    // Update game logic at full speed
+    // Update game logic at full speed (60fps)
     if (gameRef.current && gameRef.current.status === "playing") {
       updateGame(gameRef.current, dt);
     }
 
-    // Throttle React re-renders to ~30fps (every 33ms) for smoother performance
-    if (now - lastRenderRef.current >= 33) {
+    // Throttle React re-renders to ~24fps (every 42ms) for smoother touch response
+    // Game logic still runs at 60fps, only UI updates are throttled
+    if (now - lastRenderRef.current >= 42) {
       lastRenderRef.current = now;
-      forceUpdate();
+      setTick((t) => t + 1);
     }
 
     if (gameRef.current && gameRef.current.status !== "gameover") {
@@ -178,10 +324,14 @@ export default function GameScreen() {
     isRunning.current = true;
     lastTimeRef.current = Date.now();
     lastRenderRef.current = Date.now();
-    animFrameRef.current = requestAnimationFrame(loop);
+    // Use InteractionManager to start loop after animations complete
+    const handle = InteractionManager.runAfterInteractions(() => {
+      animFrameRef.current = requestAnimationFrame(loop);
+    });
     return () => {
       isRunning.current = false;
       cancelAnimationFrame(animFrameRef.current);
+      handle.cancel();
     };
   }, [loop]);
 
@@ -229,152 +379,77 @@ export default function GameScreen() {
       {/* ---- BACKGROUND (Memoized - never re-renders) ---- */}
       <StaticBackground />
 
-      {/* ---- FALLING EGGS ---- */}
+      {/* ---- FALLING EGGS (Memoized) ---- */}
       {currentGame.eggs.map((egg) => (
-        <View
-          key={egg.id}
-          style={[
-            styles.eggContainer,
-            {
-              left: egg.x - egg.w * 0.6,
-              top: egg.y - egg.h * 0.6,
-              transform: [{ rotate: `${egg.rotAngle}rad` }],
-            },
-          ]}
-        >
-          <Text style={{ fontSize: egg.w * 1.2 }}>
-            {EGG_TYPES[egg.type].emoji}
-          </Text>
-        </View>
+        <Egg key={egg.id} egg={egg} />
       ))}
 
-      {/* ---- BASKET + CHARACTER ---- */}
-      <View
-        style={[
-          styles.basketContainer,
-          {
-            left: currentGame.basket.x - currentGame.basket.w / 2,
-            top: currentGame.basket.y - 30,
-          },
-        ]}
-        pointerEvents="none"
-      >
-        {/* Character head */}
-        <View style={styles.characterHead}>
-          <View style={styles.cap} />
-          <View style={styles.face}>
-            <View style={styles.eyeRow}>
-              <View style={styles.eye} />
-              <View style={styles.eye} />
-            </View>
-            <Text style={styles.mouth}>⌣</Text>
-          </View>
-        </View>
+      {/* ---- BASKET + CHARACTER (Memoized) ---- */}
+      <Character
+        basketX={currentGame.basket.x}
+        basketY={currentGame.basket.y}
+        basketW={currentGame.basket.w}
+        magnetActive={currentGame.powerups.magnet.active}
+        freezeActive={currentGame.powerups.freeze.active}
+      />
 
-        {/* Character body */}
-        <View style={styles.characterBody}>
-          {/* Arms */}
-          <View style={styles.armLeft} />
-          <View style={styles.armRight} />
-
-          {/* Overalls */}
-          <View style={styles.overalls}>
-            <View style={styles.shirt} />
-          </View>
-        </View>
-
-        {/* Basket */}
-        <View style={[styles.basket, { width: currentGame.basket.w }]}>
-          <View style={styles.basketRim} />
-          <View style={styles.basketBody}>
-            {/* Weave lines */}
-            <View style={styles.weaveLine} />
-            <View style={[styles.weaveLine, { top: "50%" }]} />
-            <View style={[styles.weaveLine, { top: "75%" }]} />
-          </View>
-        </View>
-
-        {/* Powerup Auras */}
-        {currentGame.powerups.magnet.active && (
-          <View style={[styles.aura, styles.magnetAura]} />
-        )}
-        {currentGame.powerups.freeze.active && (
-          <View style={[styles.aura, styles.freezeAura]} />
-        )}
-      </View>
-
-      {/* ---- PARTICLES ---- */}
+      {/* ---- PARTICLES (Memoized) ---- */}
       {currentGame.particles.map((p) => (
-        <Text
-          key={p.id}
-          style={[
-            styles.particle,
-            {
-              left: p.x - p.size / 2,
-              top: p.y - p.size / 2,
-              fontSize: p.size,
-              opacity: Math.max(0, p.life),
-            },
-          ]}
-        >
-          {p.emoji}
-        </Text>
+        <Particle key={p.id} p={p} />
       ))}
 
-      {/* ---- SCORE POPUPS ---- */}
+      {/* ---- SCORE POPUPS (Memoized) ---- */}
       {currentGame.scorePopups.map((sp) => (
-        <Text
-          key={sp.id}
-          style={[
-            styles.scorePopup,
-            {
-              left: sp.x - 50,
-              top: sp.y,
-              opacity: Math.max(0, sp.life),
-              color:
-                sp.popType === "negative"
-                  ? "#E53935"
-                  : sp.popType === "golden"
-                    ? "#FFD700"
-                    : "#4CAF50",
-            },
-          ]}
-        >
-          {sp.text}
-        </Text>
+        <ScorePopupItem key={sp.id} sp={sp} />
       ))}
 
       {/* ---- HUD ---- */}
-      <View style={[styles.hud, { top: insets.top + 5 }]}>
+      <View style={[styles.hud, { top: insets.top + 10 }]}>
+        {/* Left side - Lives and controls */}
         <View style={styles.hudLeft}>
-          <Text style={styles.livesText}>{livesDisplay.join("")}</Text>
-          <TouchableOpacity
-            style={styles.hudBtn}
-            onPress={handlePause}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.hudBtnText}>{isPaused ? "▶️" : "⏸️"}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.hudBtn}
-            onPress={handleMute}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.hudBtnText}>{isMuted ? "🔇" : "🔊"}</Text>
-          </TouchableOpacity>
+          <View style={styles.livesContainer}>
+            <Text style={styles.livesText}>{livesDisplay.join(" ")}</Text>
+          </View>
+          <View style={styles.controlsRow}>
+            <TouchableOpacity
+              style={styles.hudBtn}
+              onPress={handlePause}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.hudBtnText}>{isPaused ? "▶️" : "⏸️"}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.hudBtn}
+              onPress={handleMute}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.hudBtnText}>{isMuted ? "🔇" : "🔊"}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {currentGame.combo >= 3 && (
-          <View style={styles.comboContainer}>
-            <Text style={styles.comboText}>
-              🔥 x{comboMultiplier} ({currentGame.combo})
-            </Text>
+        {/* Center - Level and Combo */}
+        <View style={styles.hudCenter}>
+          <View style={styles.levelContainer}>
+            <Text style={styles.levelLabel}>LEVEL</Text>
+            <Text style={styles.levelValue}>{Math.floor(currentGame.difficulty)}</Text>
           </View>
-        )}
+          {currentGame.combo >= 3 && (
+            <View style={styles.comboContainer}>
+              <Text style={styles.comboText}>
+                🔥 x{comboMultiplier}
+              </Text>
+              <Text style={styles.comboCount}>{currentGame.combo} hits</Text>
+            </View>
+          )}
+        </View>
 
+        {/* Right side - Score */}
         <View style={styles.hudRight}>
-          <Text style={styles.scoreLabel}>SCORE</Text>
-          <Text style={styles.scoreValue}>{currentGame.score}</Text>
+          <View style={styles.scoreContainer}>
+            <Text style={styles.scoreLabel}>SCORE</Text>
+            <Text style={styles.scoreValue}>{currentGame.score.toLocaleString()}</Text>
+          </View>
         </View>
       </View>
 
@@ -382,20 +457,42 @@ export default function GameScreen() {
       {isPaused && (
         <View style={styles.overlay}>
           <View style={styles.overlayBox}>
-            <Text style={styles.overlayTitle}>⏸️ PAUSED</Text>
+            <View style={styles.pauseIconContainer}>
+              <Text style={styles.pauseIcon}>⏸️</Text>
+            </View>
+            <Text style={styles.overlayTitle}>GAME PAUSED</Text>
+            
+            {/* Game Stats */}
+            <View style={styles.statsContainer}>
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Score</Text>
+                <Text style={styles.statValue}>{currentGame.score.toLocaleString()}</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Level</Text>
+                <Text style={styles.statValue}>{Math.floor(currentGame.difficulty)}</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Lives</Text>
+                <Text style={styles.statValue}>{currentGame.lives}/{currentGame.maxLives}</Text>
+              </View>
+            </View>
+
             <TouchableOpacity
               style={styles.resumeBtn}
               onPress={handlePause}
               activeOpacity={0.8}
             >
-              <Text style={styles.resumeBtnText}>▶️ RESUME</Text>
+              <Text style={styles.resumeBtnText}>▶️  RESUME</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.quitBtn}
               onPress={handleQuit}
               activeOpacity={0.8}
             >
-              <Text style={styles.quitBtnText}>🏠 QUIT</Text>
+              <Text style={styles.quitBtnText}>🏠  QUIT TO MENU</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -719,121 +816,234 @@ const styles = StyleSheet.create({
   // ---- HUD ----
   hud: {
     position: "absolute",
-    left: 10,
-    right: 10,
+    left: 12,
+    right: 12,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     zIndex: 50,
   },
   hudLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+    alignItems: "flex-start",
+    gap: 8,
   },
-  livesText: {
-    fontSize: 20,
-  },
-  hudBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.85)",
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 3,
+  livesContainer: {
+    backgroundColor: "rgba(255,255,255,0.95)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    elevation: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
-    shadowRadius: 3,
+    shadowRadius: 4,
+  },
+  livesText: {
+    fontSize: 18,
+    letterSpacing: 2,
+  },
+  controlsRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  hudBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.95)",
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   hudBtnText: {
-    fontSize: 18,
+    fontSize: 20,
+  },
+  hudCenter: {
+    alignItems: "center",
+    gap: 8,
+  },
+  levelContainer: {
+    backgroundColor: "rgba(103, 58, 183, 0.9)",
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignItems: "center",
+    elevation: 4,
+    shadowColor: "#4527A0",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  levelLabel: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.8)",
+    letterSpacing: 1.5,
+  },
+  levelValue: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#FFF",
   },
   comboContainer: {
-    backgroundColor: "rgba(255,87,34,0.9)",
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20,
+    backgroundColor: "rgba(255, 87, 34, 0.95)",
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignItems: "center",
+    elevation: 4,
+    shadowColor: "#E64A19",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
   },
   comboText: {
-    fontSize: 14,
-    fontWeight: "800",
+    fontSize: 16,
+    fontWeight: "900",
     color: "#FFF",
+  },
+  comboCount: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.8)",
   },
   hudRight: {
     alignItems: "flex-end",
-    backgroundColor: "rgba(255,255,255,0.85)",
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    elevation: 3,
+  },
+  scoreContainer: {
+    backgroundColor: "rgba(255,255,255,0.95)",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    alignItems: "center",
+    elevation: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
-    shadowRadius: 3,
+    shadowRadius: 4,
+    minWidth: 90,
   },
   scoreLabel: {
-    fontSize: 10,
-    fontWeight: "600",
+    fontSize: 9,
+    fontWeight: "700",
     color: "#888",
     letterSpacing: 1.5,
   },
   scoreValue: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "900",
-    color: "#333",
+    color: "#2E7D32",
   },
 
   // ---- Pause Overlay ----
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: "rgba(0,0,0,0.7)",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 100,
   },
   overlayBox: {
     backgroundColor: "#FFF",
-    borderRadius: 24,
-    padding: 30,
+    borderRadius: 28,
+    padding: 28,
     alignItems: "center",
-    gap: 14,
-    elevation: 10,
-    width: 260,
+    elevation: 12,
+    width: 300,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+  },
+  pauseIconContainer: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: "#F5F5F5",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  pauseIcon: {
+    fontSize: 36,
   },
   overlayTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "900",
     color: "#333",
-    marginBottom: 10,
+    letterSpacing: 2,
+    marginBottom: 16,
+  },
+  statsContainer: {
+    flexDirection: "row",
+    backgroundColor: "#F5F5F5",
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    marginBottom: 20,
+    width: "100%",
+    justifyContent: "space-around",
+  },
+  statItem: {
+    alignItems: "center",
+    flex: 1,
+  },
+  statLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#888",
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#333",
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: "#DDD",
   },
   resumeBtn: {
     backgroundColor: "#4CAF50",
-    paddingHorizontal: 30,
-    paddingVertical: 14,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
     borderRadius: 50,
-    elevation: 4,
+    elevation: 6,
     width: "100%",
     alignItems: "center",
+    marginBottom: 12,
+    shadowColor: "#2E7D32",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
   resumeBtnText: {
     fontSize: 18,
     fontWeight: "800",
     color: "#FFF",
+    letterSpacing: 1,
   },
   quitBtn: {
     backgroundColor: "#FF9800",
-    paddingHorizontal: 30,
-    paddingVertical: 14,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
     borderRadius: 50,
-    elevation: 4,
+    elevation: 6,
     width: "100%",
     alignItems: "center",
+    shadowColor: "#E65100",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
   quitBtnText: {
     fontSize: 18,
     fontWeight: "800",
     color: "#FFF",
+    letterSpacing: 1,
   },
 });
