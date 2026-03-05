@@ -1,9 +1,10 @@
 {
   "expo": {
-    "name": "devapp",
-    "slug": "devapp",
+    "name": "Egg Catcher",
+    "slug": "egg-catcher",
     "version": "1.0.0",
     "orientation": "portrait",
+    "backgroundColor": "#87CEEB",
     "icon": "./assets/images/icon.png",
     "scheme": "devapp",
     "userInterfaceStyle": "automatic",

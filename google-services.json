@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "835418629907",
+    "project_id": "eggcatcher-31828",
+    "storage_bucket": "eggcatcher-31828.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:835418629907:android:30939b48089bdb6a625ce6",
+        "android_client_info": {
+          "package_name": "com.eggcatcher.game"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCYXrl2EbzVyxp2hV7c-mEnhK5ja19euwU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
