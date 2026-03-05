@@ -12,7 +12,12 @@
           "package_name": "com.eggcatcher.game"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "835418629907-4kmed5b2q9mneqpl3ulp0o88oi5rd9d4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCYXrl2EbzVyxp2hV7c-mEnhK5ja19euwU"
@@ -20,7 +25,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "835418629907-4kmed5b2q9mneqpl3ulp0o88oi5rd9d4.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

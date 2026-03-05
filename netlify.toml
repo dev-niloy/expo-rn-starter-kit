@@ -1,0 +1,4 @@
+[build]
+  command = "expo export -p web"
+  functions = "netlify/functions"
+  publish = "dist"

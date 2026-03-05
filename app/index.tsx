@@ -2,21 +2,39 @@
    EGG CATCHER – Menu Screen
    ============================================ */
 
-import React, { useEffect, useRef, useState } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  Animated,
-  Easing,
-} from "react-native";
+import { GameAudio } from "@/utils/audio";
+import { GuestUser, Storage } from "@/utils/storage";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Animated,
+  Dimensions,
+  Easing,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GameAudio } from "@/utils/audio";
-import { Storage, GuestUser } from "@/utils/storage";
+
+import { initializeApp } from "firebase/app";
+
+export const GOOGLE_WEB_CLIENT_ID =
+  "39268486080-ls310i27urtqm5hcnoukjssgur100v82.apps.googleusercontent.com";
+export const GOOGLE_ANDROID_CLIENT_ID =
+  "39268486080-q10eqe5f94fks6t7kctq8r9ppl5npfs4.apps.googleusercontent.com";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCYXrl2EbzVyxp2hV7c-mEnhK5ja19euwU",
+  authDomain: "eggcatcher-31828.firebaseapp.com",
+  projectId: "eggcatcher-31828",
+  storageBucket: "eggcatcher-31828.firebasestorage.app",
+  messagingSenderId: "835418629907",
+  appId: "1:835418629907:android:30939b48089bdb6a625ce6",
+};
+
+const app = initializeApp(firebaseConfig);
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
@@ -153,9 +171,7 @@ export default function MenuScreen() {
       <Text style={[styles.sun, { top: insets.top + 20 }]}>☀️</Text>
 
       {/* Clouds */}
-      <Text style={[styles.cloud, { top: insets.top + 40, left: 20 }]}>
-        ☁️
-      </Text>
+      <Text style={[styles.cloud, { top: insets.top + 40, left: 20 }]}>☁️</Text>
       <Text style={[styles.cloud, { top: insets.top + 80, right: 30 }]}>
         ☁️
       </Text>
@@ -185,20 +201,10 @@ export default function MenuScreen() {
       <Text style={[styles.flower, { bottom: SCREEN_H * 0.18, left: 100 }]}>
         🌻
       </Text>
-      <Text
-        style={[
-          styles.flower,
-          { bottom: SCREEN_H * 0.2, right: 40 },
-        ]}
-      >
+      <Text style={[styles.flower, { bottom: SCREEN_H * 0.2, right: 40 }]}>
         🌺
       </Text>
-      <Text
-        style={[
-          styles.flower,
-          { bottom: SCREEN_H * 0.24, right: 120 },
-        ]}
-      >
+      <Text style={[styles.flower, { bottom: SCREEN_H * 0.24, right: 120 }]}>
         🌼
       </Text>
 

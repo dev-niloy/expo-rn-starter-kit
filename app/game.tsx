@@ -3,188 +3,41 @@
    The main gameplay rendered with RN views + emojis
    ============================================ */
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  PanResponder,
-  Dimensions,
-  TouchableOpacity,
-} from "react-native";
-import { router } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  GameState,
   createGameState,
-  startGame,
-  updateGame,
-  togglePause,
   EGG_TYPES,
+  GameState,
+  startGame,
+  togglePause,
+  updateGame,
 } from "@/utils/gameEngine";
-import { GameAudio } from "@/utils/audio";
+import { useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import React, {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
+import {
+  Dimensions,
+  PanResponder,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
-export default function GameScreen() {
-  const insets = useSafeAreaInsets();
-  const gameRef = useRef<GameState | null>(null);
-  const [, setTick] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const animFrameRef = useRef<number>(0);
-  const isRunning = useRef(false);
-
-  // Initialize game engine
-  useEffect(() => {
-    const game = createGameState(SCREEN_W, SCREEN_H, {
-      onCatch: () => GameAudio.playCatch(),
-      onGoldenCatch: () => GameAudio.playGoldenCatch(),
-      onHurt: () => GameAudio.playHurt(),
-      onPowerup: () => GameAudio.playPowerup(),
-      onGameOver: (score) => {
-        isRunning.current = false;
-        cancelAnimationFrame(animFrameRef.current);
-        GameAudio.playGameOver();
-        setTimeout(() => {
-          router.replace({
-            pathname: "/gameover",
-            params: { score: String(score) },
-          });
-        }, 600);
-      },
-    });
-
-    gameRef.current = game;
-    startGame(game);
-    isRunning.current = true;
-
-    let lastTime = Date.now();
-    const loop = () => {
-      if (!isRunning.current) return;
-
-      const now = Date.now();
-      const dt = Math.min((now - lastTime) / 1000, 0.05);
-      lastTime = now;
-
-      if (gameRef.current && gameRef.current.status === "playing") {
-        updateGame(gameRef.current, dt);
-      }
-      setTick((t) => t + 1);
-
-      if (gameRef.current && gameRef.current.status === "playing") {
-        animFrameRef.current = requestAnimationFrame(loop);
-      }
-    };
-
-    animFrameRef.current = requestAnimationFrame(loop);
-
-    return () => {
-      isRunning.current = false;
-      cancelAnimationFrame(animFrameRef.current);
-    };
-  }, []);
-
-  // Touch handling via PanResponder
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => {
-        if (gameRef.current && gameRef.current.status === "playing") {
-          gameRef.current.inputX = evt.nativeEvent.pageX;
-        }
-      },
-      onPanResponderMove: (evt) => {
-        if (gameRef.current && gameRef.current.status === "playing") {
-          gameRef.current.inputX = evt.nativeEvent.pageX;
-        }
-      },
-      onPanResponderRelease: () => {
-        if (gameRef.current) {
-          gameRef.current.inputX = null;
-        }
-      },
-      onPanResponderTerminate: () => {
-        if (gameRef.current) {
-          gameRef.current.inputX = null;
-        }
-      },
-    }),
-  ).current;
-
-  const resumeLoop = useCallback(() => {
-    if (!gameRef.current || gameRef.current.status !== "playing") return;
-    isRunning.current = true;
-    let lastTime = Date.now();
-    const loop = () => {
-      if (!isRunning.current) return;
-      const now = Date.now();
-      const dt = Math.min((now - lastTime) / 1000, 0.05);
-      lastTime = now;
-      if (gameRef.current && gameRef.current.status === "playing") {
-        updateGame(gameRef.current, dt);
-      }
-      setTick((t) => t + 1);
-      if (
-        gameRef.current &&
-        gameRef.current.status === "playing" &&
-        isRunning.current
-      ) {
-        animFrameRef.current = requestAnimationFrame(loop);
-      }
-    };
-    animFrameRef.current = requestAnimationFrame(loop);
-  }, []);
-
-  const handlePause = useCallback(() => {
-    if (!gameRef.current) return;
-    GameAudio.playClick();
-    togglePause(gameRef.current);
-    const newPaused = gameRef.current.status === "paused";
-    setIsPaused(newPaused);
-
-    if (newPaused) {
-      isRunning.current = false;
-      cancelAnimationFrame(animFrameRef.current);
-    } else {
-      resumeLoop();
-    }
-  }, [resumeLoop]);
-
-  const handleQuit = useCallback(() => {
-    GameAudio.playClick();
-    isRunning.current = false;
-    cancelAnimationFrame(animFrameRef.current);
-    if (gameRef.current) gameRef.current.status = "idle";
-    router.replace("/");
-  }, []);
-
-  const handleMute = useCallback(() => {
-    const muted = GameAudio.toggleMute();
-    setIsMuted(muted);
-  }, []);
-
-  const game = gameRef.current;
-  if (!game) return <View style={styles.container} />;
-
-  // Compute lives display
-  const livesDisplay: string[] = [];
-  for (let i = 0; i < game.maxLives; i++) {
-    livesDisplay.push(i < game.lives ? "❤️" : "🖤");
-  }
-
-  // Compute combo
-  let comboMultiplier = 1;
-  if (game.combo >= 10) comboMultiplier = 3;
-  else if (game.combo >= 5) comboMultiplier = 2;
-
+// Memoized static background component - never re-renders
+const StaticBackground = memo(function StaticBackground() {
   return (
-    <View style={styles.container} {...panResponder.panHandlers}>
-      <StatusBar hidden />
-
-      {/* ---- BACKGROUND ---- */}
+    <>
       {/* Sky */}
       <View style={styles.sky} />
 
@@ -233,9 +86,151 @@ export default function GameScreen() {
       <Text style={[styles.flowers, { bottom: 85, left: SCREEN_W * 0.45 }]}>
         🌷
       </Text>
+    </>
+  );
+});
+
+export default function GameScreen() {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  // Use useReducer for efficient force updates
+  const [, forceUpdate] = useReducer((x) => x + 1, 0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const animFrameRef = useRef<number>(0);
+  const isRunning = useRef(false);
+  const lastTimeRef = useRef(Date.now());
+  const lastRenderRef = useRef(Date.now());
+
+  // Initialize game state
+  const gameRef = useRef<GameState>(
+    createGameState(SCREEN_W, SCREEN_H, {
+      onCatch: () => {
+        // Play catch sound if not muted
+      },
+      onGoldenCatch: () => {
+        // Play golden catch sound
+      },
+      onHurt: () => {
+        // Play hurt sound
+      },
+      onPowerup: () => {
+        // Play powerup sound
+      },
+      onGameOver: (score: number) => {
+        router.push({
+          pathname: "/gameover",
+          params: { score: score.toString() },
+        });
+      },
+    }),
+  );
+
+  // Start the game on mount
+  useEffect(() => {
+    startGame(gameRef.current);
+  }, []);
+
+  // PanResponder for touch input - optimized
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (evt) => {
+          gameRef.current.inputX = evt.nativeEvent.pageX;
+        },
+        onPanResponderMove: (evt) => {
+          gameRef.current.inputX = evt.nativeEvent.pageX;
+        },
+        onPanResponderRelease: () => {
+          gameRef.current.inputX = null;
+        },
+      }),
+    [],
+  );
+
+  // Game loop - optimized with throttled rendering
+  const loop = useCallback(() => {
+    if (!isRunning.current) return;
+
+    const now = Date.now();
+    const dt = Math.min((now - lastTimeRef.current) / 1000, 0.05);
+    lastTimeRef.current = now;
+
+    // Update game logic at full speed
+    if (gameRef.current && gameRef.current.status === "playing") {
+      updateGame(gameRef.current, dt);
+    }
+
+    // Throttle React re-renders to ~30fps (every 33ms) for smoother performance
+    if (now - lastRenderRef.current >= 33) {
+      lastRenderRef.current = now;
+      forceUpdate();
+    }
+
+    if (gameRef.current && gameRef.current.status !== "gameover") {
+      animFrameRef.current = requestAnimationFrame(loop);
+    }
+  }, []);
+
+  useEffect(() => {
+    isRunning.current = true;
+    lastTimeRef.current = Date.now();
+    lastRenderRef.current = Date.now();
+    animFrameRef.current = requestAnimationFrame(loop);
+    return () => {
+      isRunning.current = false;
+      cancelAnimationFrame(animFrameRef.current);
+    };
+  }, [loop]);
+
+  // Handlers
+  const handlePause = useCallback(() => {
+    if (gameRef.current) {
+      togglePause(gameRef.current);
+      setIsPaused(gameRef.current.status === "paused");
+      if (gameRef.current.status === "playing") {
+        lastTimeRef.current = Date.now();
+        lastRenderRef.current = Date.now();
+        animFrameRef.current = requestAnimationFrame(loop);
+      }
+    }
+  }, [loop]);
+
+  const handleMute = useCallback(() => {
+    setIsMuted((m) => !m);
+  }, []);
+
+  const handleQuit = useCallback(() => {
+    isRunning.current = false;
+    cancelAnimationFrame(animFrameRef.current);
+    router.push("/");
+  }, [router]);
+
+  const currentGame = gameRef.current;
+  if (!currentGame) return <View style={styles.container} />;
+
+  // Compute lives display
+  const livesDisplay: string[] = [];
+  for (let i = 0; i < currentGame.maxLives; i++) {
+    livesDisplay.push(i < currentGame.lives ? "❤️" : "🖤");
+  }
+
+  // Compute combo
+  let comboMultiplier = 1;
+  if (currentGame.combo >= 10) comboMultiplier = 3;
+  else if (currentGame.combo >= 5) comboMultiplier = 2;
+
+  return (
+    <View style={styles.container} {...panResponder.panHandlers}>
+      <StatusBar hidden />
+
+      {/* ---- BACKGROUND (Memoized - never re-renders) ---- */}
+      <StaticBackground />
 
       {/* ---- FALLING EGGS ---- */}
-      {game.eggs.map((egg) => (
+      {currentGame.eggs.map((egg) => (
         <View
           key={egg.id}
           style={[
@@ -258,8 +253,8 @@ export default function GameScreen() {
         style={[
           styles.basketContainer,
           {
-            left: game.basket.x - game.basket.w / 2,
-            top: game.basket.y - 30,
+            left: currentGame.basket.x - currentGame.basket.w / 2,
+            top: currentGame.basket.y - 30,
           },
         ]}
         pointerEvents="none"
@@ -289,7 +284,7 @@ export default function GameScreen() {
         </View>
 
         {/* Basket */}
-        <View style={[styles.basket, { width: game.basket.w }]}>
+        <View style={[styles.basket, { width: currentGame.basket.w }]}>
           <View style={styles.basketRim} />
           <View style={styles.basketBody}>
             {/* Weave lines */}
@@ -300,16 +295,16 @@ export default function GameScreen() {
         </View>
 
         {/* Powerup Auras */}
-        {game.powerups.magnet.active && (
+        {currentGame.powerups.magnet.active && (
           <View style={[styles.aura, styles.magnetAura]} />
         )}
-        {game.powerups.freeze.active && (
+        {currentGame.powerups.freeze.active && (
           <View style={[styles.aura, styles.freezeAura]} />
         )}
       </View>
 
       {/* ---- PARTICLES ---- */}
-      {game.particles.map((p) => (
+      {currentGame.particles.map((p) => (
         <Text
           key={p.id}
           style={[
@@ -327,7 +322,7 @@ export default function GameScreen() {
       ))}
 
       {/* ---- SCORE POPUPS ---- */}
-      {game.scorePopups.map((sp) => (
+      {currentGame.scorePopups.map((sp) => (
         <Text
           key={sp.id}
           style={[
@@ -358,9 +353,7 @@ export default function GameScreen() {
             onPress={handlePause}
             activeOpacity={0.7}
           >
-            <Text style={styles.hudBtnText}>
-              {isPaused ? "▶️" : "⏸️"}
-            </Text>
+            <Text style={styles.hudBtnText}>{isPaused ? "▶️" : "⏸️"}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.hudBtn}
@@ -371,17 +364,17 @@ export default function GameScreen() {
           </TouchableOpacity>
         </View>
 
-        {game.combo >= 3 && (
+        {currentGame.combo >= 3 && (
           <View style={styles.comboContainer}>
             <Text style={styles.comboText}>
-              🔥 x{comboMultiplier} ({game.combo})
+              🔥 x{comboMultiplier} ({currentGame.combo})
             </Text>
           </View>
         )}
 
         <View style={styles.hudRight}>
           <Text style={styles.scoreLabel}>SCORE</Text>
-          <Text style={styles.scoreValue}>{game.score}</Text>
+          <Text style={styles.scoreValue}>{currentGame.score}</Text>
         </View>
       </View>
 

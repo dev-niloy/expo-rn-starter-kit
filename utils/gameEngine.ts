@@ -231,6 +231,7 @@ export function updateGame(state: GameState, dt: number): void {
   updateEggs(state, eggDt);
   updateParticles(state, dt);
   updateScorePopups(state, dt);
+  // Collision detection is handled in updateEggs
 }
 
 // ---- Basket ----
@@ -247,10 +248,7 @@ function updateBasket(state: GameState, dt: number): void {
   basket.x += dx * 12 * dt;
 
   // Clamp
-  basket.x = Math.max(
-    basket.w / 2,
-    Math.min(screenW - basket.w / 2, basket.x),
-  );
+  basket.x = Math.max(basket.w / 2, Math.min(screenW - basket.w / 2, basket.x));
 }
 
 // ---- Egg Spawning ----
